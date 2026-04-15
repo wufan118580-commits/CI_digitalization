@@ -1,0 +1,24 @@
+[Unit]
+Description=Organization Management API
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/org-management
+ExecStart=/usr/bin/python3 /opt/org-management/main.py
+Restart=always
+RestartSec=5
+
+# 环境变量
+Environment="DB_HOST=你的云数据库地址"
+Environment="DB_PORT=3306"
+Environment="DB_USER=用户名"
+Environment="DB_PASSWORD=密码"
+Environment="DB_NAME=organization_db"
+Environment="WECHAT_APPID=微信AppID"
+Environment="WECHAT_SECRET=微信Secret"
+Environment="JWT_SECRET_KEY=你的随机密钥"
+
+[Install]
+WantedBy=multi-user.target
