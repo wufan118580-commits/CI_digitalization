@@ -1,51 +1,43 @@
 #!/bin/bash
-# 本地部署脚本（无需拉取代码）
+# 服务器部署脚本
 
 set -e
 
-PORT=8080
+PROJECT_DIR="/opt/org-management"
+SERVICE_NAME="org-management"
+PORT=8000
 
-echo "===== 本地部署 org-management ====="
+echo "===== 开始部署 $SERVICE_NAME ====="
 
-# 检查依赖
-if ! command -v docker &> /dev/null; then
-    echo "错误: Docker 未安装"
-    exit 1
-fi
+# 进入项目目录
+cd $PROJECT_DIR
 
-# 构建镜像
-echo ">>> 构建 Docker 镜像..."
-docker build -t org-management:local .
+# 拉取最新代码
+echo ">>> 拉取代码..."
+git pull origin main
 
-# 停止旧容器
-echo ">>> 停止旧容器..."
-docker stop org-management-local 2>/dev/null || true
-docker rm org-management-local 2>/dev/null || true
+# 安装依赖
+echo ">>> 安装依赖..."
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 启动容器
+# 停止旧服务
+echo ">>> 停止旧服务..."
+pkill -f "uvicorn main:app" || true
+sleep 2
+
+# 启动新服务
 echo ">>> 启动服务..."
-docker run -d \
-    --name org-management-local \
-    --restart always \
-    -p ${PORT}:8080 \
-    -e DB_HOST=$DB_HOST \
-    -e DB_PORT=$DB_PORT \
-    -e DB_USER=$DB_USER \
-    -e DB_PASSWORD=$DB_PASSWORD \
-    -e DB_NAME=$DB_NAME \
-    -e JWT_SECRET_KEY=$JWT_SECRET_KEY \
-    -e WECHAT_APPID=$WECHAT_APPID \
-    -e WECHAT_SECRET=$WECHAT_SECRET \
-    org-management:local
+nohup uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 > app.log 2>&1 &
 
-# 验证
+# 等待服务启动
 sleep 3
-if docker ps | grep -q org-management-local; then
+
+# 检查服务状态
+if curl -sf http://127.0.0.1:$PORT/health > /dev/null; then
     echo "===== 部署成功 ====="
-    echo "访问地址: http://localhost:${PORT}"
-    echo "健康检查: http://localhost:${PORT}/health"
+    echo "服务地址: http://127.0.0.1:$PORT"
 else
-    echo "===== 部署失败 ====="
-    docker logs org-management-local
+    echo "===== 部署失败，服务未正常启动 ====="
+    echo "查看日志: tail -f $PROJECT_DIR/app.log"
     exit 1
 fi
