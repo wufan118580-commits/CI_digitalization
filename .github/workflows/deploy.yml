@@ -15,7 +15,6 @@ jobs:
   test:
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    
     services:
       mysql:
         image: mysql:8.0
@@ -65,146 +64,137 @@ jobs:
     if: github.event.pull_request.merged == true && github.base_ref == 'main'
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy to Server via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-          REPO: ${{ github.repository }}
-        script: |
-          echo "===== 开始部署生产环境 ====="
-          
-          sudo mkdir -p /opt/org-management
-          sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /opt/org-management
-          
-          cd /opt/org-management
-          
-          git clone --depth 1 https://github.com/${{ env.REPO }}.git /tmp/org-management-latest
-          cp -r /tmp/org-management-latest/. /opt/org-management/
-          rm -rf /tmp/org-management-latest
-          
-          # 配置 Docker 镜像加速
-          sudo mkdir -p /etc/docker
-          sudo tee /etc/docker/daemon.json <<'EOF'
-          {
-            "registry-mirrors": [
-              "https://mirror.ccs.tencentyun.com",
-              "https://pypi.tuna.tsinghua.edu.cn"
-            ]
-          }
-          EOF
-          
-          sudo systemctl daemon-reload
-          sudo systemctl restart docker || true
-          
-          # 构建 Docker 镜像
-          docker build \
-            --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-            --build-arg PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
-            -t org-management:prod .
-          
-          # 停止并删除旧容器
-          docker stop org-management-prod || true
-          docker rm org-management-prod || true
-          
-          # 启动新容器
-          docker run -d \
-            --name org-management-prod \
-            --restart always \
-            -p 8080:8080 \
-            -e DB_HOST=${{ secrets.DB_HOST }} \
-            -e DB_PORT=${{ secrets.DB_PORT }} \
-            -e DB_USER=${{ secrets.DB_USER }} \
-            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            -e DB_NAME=${{ secrets.DB_NAME }} \
-            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
-            -e WECHAT_APPID=${{ secrets.WECHAT_APPID }} \
-            -e WECHAT_SECRET=${{ secrets.WECHAT_SECRET }} \
-            org-management:prod
-          
-          # 验证部署
-          sleep 5
-          if docker ps | grep -q org-management-prod; then
-            echo "===== 部署成功 ====="
-            curl -s http://localhost:8080/health || true
-          else
-            echo "===== 部署失败 ====="
-            docker logs org-management-prod
-            exit 1
-          fi
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          script_stop: true
+          script: |
+            echo "===== 开始部署生产环境 ====="
+
+            sudo mkdir -p /opt/org-management
+            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /opt/org-management
+
+            cd /opt/org-management
+            git clone --depth 1 https://github.com/${{ github.repository }}.git /tmp/org-management-latest
+            cp -r /tmp/org-management-latest/. /opt/org-management/
+            rm -rf /tmp/org-management-latest
+
+            cd /opt/org-management
+
+            sudo mkdir -p /etc/docker
+            sudo tee /etc/docker/daemon.json <<'EOF'
+            {
+              "registry-mirrors": [
+                "https://mirror.ccs.tencentyun.com",
+                "https://pypi.tuna.tsinghua.edu.cn"
+              ]
+            }
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart docker || true
+
+            docker build \
+              --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+              --build-arg PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
+              -t org-management:prod .
+
+            docker stop org-management-prod || true
+            docker rm org-management-prod || true
+
+            docker run -d \
+              --name org-management-prod \
+              --restart always \
+              -p 8080:8080 \
+              -e DB_HOST=${{ secrets.DB_HOST }} \
+              -e DB_PORT=${{ secrets.DB_PORT }} \
+              -e DB_USER=${{ secrets.DB_USER }} \
+              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e DB_NAME=${{ secrets.DB_NAME }} \
+              -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
+              -e WECHAT_APPID=${{ secrets.WECHAT_APPID }} \
+              -e WECHAT_SECRET=${{ secrets.WECHAT_SECRET }} \
+              org-management:prod
+
+            sleep 5
+            if docker ps | grep -q org-management-prod; then
+              echo "===== 部署成功 ====="
+              curl -s http://localhost:8080/health || true
+            else
+              echo "===== 部署失败 ====="
+              docker logs org-management-prod
+              exit 1
+            fi
 
   # ==================== develop 推送：部署到预发布服务器 ====================
   deploy-staging:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy to Staging Server
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
-        env:
-          REPO: ${{ github.repository }}
-        script: |
-          echo "===== 开始部署预发布环境 ====="
-          
-          sudo mkdir -p /opt/org-management-staging
-          sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /opt/org-management-staging
-          
-          cd /opt/org-management-staging
-          git clone --depth 1 https://github.com/${{ env.REPO }}.git . 2>/dev/null || git pull origin develop
-          
-          # 配置 Docker 镜像加速
-          sudo mkdir -p /etc/docker
-          sudo tee /etc/docker/daemon.json <<'EOF'
-          {
-            "registry-mirrors": [
-              "https://mirror.ccs.tencentyun.com",
-              "https://pypi.tuna.tsinghua.edu.cn"
-            ]
-          }
-          EOF
-          
-          sudo systemctl daemon-reload
-          sudo systemctl restart docker || true
-          
-          # 构建并启动
-          docker build \
-            --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-            --build-arg PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
-            -t org-management:staging .
-          
-          docker stop org-management-staging || true
-          docker rm org-management-staging || true
-          
-          docker run -d \
-            --name org-management-staging \
-            --restart always \
-            -p 8081:8080 \
-            -e DB_HOST=${{ secrets.DB_HOST }} \
-            -e DB_PORT=${{ secrets.DB_PORT }} \
-            -e DB_USER=${{ secrets.DB_USER }} \
-            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            -e DB_NAME=${{ secrets.DB_NAME }} \
-            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
-            -e WECHAT_APPID=${{ secrets.WECHAT_APPID }} \
-            -e WECHAT_SECRET=${{ secrets.WECHAT_SECRET }} \
-            org-management:staging
-          
-          echo "===== 预发布部署完成 ====="
-          curl -s http://localhost:8081/health || true
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          script_stop: true
+          script: |
+            echo "===== 开始部署预发布环境 ====="
+
+            sudo mkdir -p /opt/org-management-staging
+            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /opt/org-management-staging
+
+            cd /opt/org-management-staging
+            git clone --depth 1 https://github.com/${{ github.repository }}.git . 2>/dev/null || git pull origin develop
+
+            sudo mkdir -p /etc/docker
+            sudo tee /etc/docker/daemon.json <<'EOF'
+            {
+              "registry-mirrors": [
+                "https://mirror.ccs.tencentyun.com",
+                "https://pypi.tuna.tsinghua.edu.cn"
+              ]
+            }
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart docker || true
+
+            docker build \
+              --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+              --build-arg PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
+              -t org-management:staging .
+
+            docker stop org-management-staging || true
+            docker rm org-management-staging || true
+
+            docker run -d \
+              --name org-management-staging \
+              --restart always \
+              -p 8081:8080 \
+              -e DB_HOST=${{ secrets.DB_HOST }} \
+              -e DB_PORT=${{ secrets.DB_PORT }} \
+              -e DB_USER=${{ secrets.DB_USER }} \
+              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e DB_NAME=${{ secrets.DB_NAME }} \
+              -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
+              -e WECHAT_APPID=${{ secrets.WECHAT_APPID }} \
+              -e WECHAT_SECRET=${{ secrets.WECHAT_SECRET }} \
+              org-management:staging
+
+            echo "===== 预发布部署完成 ====="
+            curl -s http://localhost:8081/health || true
