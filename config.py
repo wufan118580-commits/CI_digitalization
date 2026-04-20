@@ -1,5 +1,16 @@
 """配置文件"""
 import os
+from pathlib import Path
+
+# 尝试加载本地 .env 文件（开发环境）
+ENV_FILE = Path(__file__).parent / ".env"
+if ENV_FILE.exists():
+    with open(ENV_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
 
 # 数据库配置
 DB_CONFIG = {
