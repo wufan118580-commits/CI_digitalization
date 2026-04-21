@@ -8,8 +8,8 @@ services:
         PIP_TRUSTED_HOST: pypi.tuna.tsinghua.edu.cn
     container_name: org-management-api
     image: org-management:latest
-    ports:
-      - "${PORT:-8080}:8080"
+    # 使用 host 网络模式，可直接访问宿主机内网（云数据库）
+    network_mode: host
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT:-3306}
@@ -20,15 +20,3 @@ services:
       - WECHAT_APPID=${WECHAT_APPID}
       - WECHAT_SECRET=${WECHAT_SECRET}
     restart: always
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-
-networks:
-  app-network:
-    driver: bridge
