@@ -17,16 +17,18 @@
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml      # CI/CD 部署配置
-├── schema.sql              # 数据库建表语句
+├── schema.sql              # 数据库建表参考
+├── init_db.py              # 自动建表（启动时执行）
 ├── requirements.txt        # Python 依赖
 ├── config.py               # 配置文件
 ├── database.py             # 数据库连接工具
 ├── auth.py                 # JWT 认证装饰器
 ├── response.py             # 统一响应格式
 ├── models.py               # Pydantic 模型
-├── router.py               # API 路由
+├── router.py               # API 路由（8个接口）
 ├── main.py                 # FastAPI 应用入口
 ├── Dockerfile              # Docker 镜像构建
+├── docker-compose.yml      # Docker Compose 编排
 └── nginx.conf              # Nginx 反向代理配置
 ```
 
@@ -40,12 +42,36 @@
 
 ## API 接口
 
-| 接口 | 方法 | 鉴权 | 说明 |
-|------|------|------|------|
-| `POST /api/login` | 否 | 微信小程序登录，返回 JWT token |
-| `POST /api/class` | 是 | 创建班级，自动填充 org_id |
-| `GET /api/class/list` | 是 | 查询当前机构班级列表 |
-| `GET /api/teacher/info` | 是 | 获取当前教师信息 |
+| 分类 | 接口 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|------|
+| **认证** | `POST /api/login` | 否 | 微信登录，自动注册，返回 JWT token |
+| **机构** | `POST /api/org` | 是 | 创建机构 |
+| **机构** | `GET /api/org/info` | 是 | 获取当前机构信息 |
+| **班级** | `POST /api/class` | 是 | 创建班级（自动填充 org_id） |
+| **班级** | `GET /api/class/list` | 是 | 查询当前机构的班级列表 |
+| **教师** | `GET /api/teacher/info` | 是 | 获取当前教师信息 |
+| **教师** | `PUT /api/teacher/bind-class` | 是 | 教师绑定班级 |
+| **教师** | `PUT /api/teacher/profile` | 是 | 更新教师资料（手机号等） |
+
+### 业务流程
+
+```
+管理员操作:
+  POST /api/login → 获取 token
+    ↓
+  POST /api/org → 创建机构
+    ↓
+  POST /api/class → 创建班级（可多个）
+    ↓
+  分享给老师
+
+教师操作:
+  POST /api/login → 自动注册/登录
+    ↓
+  PUT /api/teacher/bind-class → 绑定班级
+    ↓
+  GET /api/class/list → 查看所在班级
+```
 
 ## 统一响应格式
 
@@ -98,28 +124,25 @@ GitHub Actions
 
 ## 已完成功能
 
-- [x] 微信小程序登录接口 (POST /api/login)
+- [x] 微信小程序登录 + 自动注册 (POST /api/login)
 - [x] JWT Token 生成与验证
 - [x] JWT 鉴权装饰器 (@jwt_required)
 - [x] 多租户数据隔离 (每个 SQL 包含 WHERE org_id = %s)
-- [x] 创建班级接口 (POST /api/class)
-- [x] 查询班级列表 (GET /api/class/list)
-- [x] 获取教师信息 (GET /api/teacher/info)
+- [x] 机构管理：创建机构、查询信息
+- [x] 班级管理：创建班级、查询列表
+- [x] 教师管理：获取信息、绑定班级、更新资料
+- [x] 应用启动自动建表 (init_db.py)
 - [x] 统一响应格式
 - [x] PyMySQL 原生 SQL 操作
-- [x] 环境变量配置支持 (.env)
-- [x] Docker 镜像构建
-- [x] GitHub Actions CI/CD 流程
-- [x] 腾讯云镜像加速配置
+- [x] Docker 镜像构建 (host 网络模式)
+- [x] GitHub Actions CI/CD 流程 (Docker Compose 部署)
 
 ## 待完成
 
 - [ ] 编写单元测试
-- [ ] API 文档 Swagger UI 定制
 - [ ] 日志配置与收集
 - [ ] 限流与安全防护
-- [ ] 教师管理 CRUD
-- [ ] 机构管理后台
+- [ ] Web 管理后台（当前仅 API）
 
 ## 测试指南
 
