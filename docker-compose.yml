@@ -32,7 +32,7 @@ services:
       - .env
     environment:
       # host模式下，MySQL通过宿主机 localhost 访问
-      DATABASE_URL: "mysql+aiomysql://${DB_USER:-root}:${DB_PASSWORD:-root123456}@127.0.0.1:${MYSQL_PORT:-3306}/${DB_NAME:-school_comm}?charset=utf8mb4"
+      DATABASE_URL: "mysql+aiomysql://${DB_USER:-root}:${DB_PASSWORD:-root123456}@127.0.0.1:${DB_PORT:-3306}/${DB_NAME:-school_comm}?charset=utf8mb4"
     depends_on:
       mysql:
         condition: service_healthy
