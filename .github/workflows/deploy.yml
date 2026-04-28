@@ -148,10 +148,10 @@ jobs:
             MAX_RETRIES=10
             for i in $(seq 1 $MAX_RETRIES); do
               sleep 3
-              API_HEALTH=$(curl -sf http://localhost:8080/health 2>/dev/null || echo "unhealthy")
+              API_HEALTH=$(curl -sf http://localhost:8080/api/health 2>/dev/null || echo "unhealthy")
               echo "[$i/$MAX_RETRIES] API: $API_HEALTH"
 
-              if [ "$API_HEALTH" = '{"status":"ok"}' ]; then
+              if echo "$API_HEALTH" | grep -q '"status": "ok"'; then
                 echo "✅ 服务已就绪"
                 break
               fi
