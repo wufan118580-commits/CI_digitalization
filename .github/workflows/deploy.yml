@@ -41,13 +41,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+          pip install -r backend/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
       - name: Run tests
         env:
@@ -57,7 +57,7 @@ jobs:
           DB_PASSWORD: test
           DB_NAME: test_db
         run: |
-          pytest tests/ -v || echo "No tests found, skipping..."
+          pytest backend/tests/ -v || echo "No tests found, skipping..."
 
   # ==================== main 分支 PR：部署到生产服务器 ====================
   deploy-production:
