@@ -1,0 +1,47 @@
+services:
+  # ==================== MySQL ====================
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${DB_NAME:-school_comm}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== API Backend (FastAPI) ====================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      # host模式下，MySQL通过宿主机 localhost 访问
+      DATABASE_URL: "mysql+aiomysql://${DB_USER:-root}:${DB_PASSWORD:-root123456}@127.0.0.1:${MYSQL_PORT:-3306}/${DB_NAME:-school_comm}?charset=utf8mb4"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  mysql_data:
+    driver: local
